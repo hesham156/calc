@@ -1,0 +1,24 @@
+{
+  "name": "suprema_biostar",
+  "label": "Suprema BioStar 2",
+  "detection": {
+    "required_any": [["user id"], ["first check-in", "last check-out"]],
+    "required_all": []
+  },
+  "date_dayfirst": false,
+  "columns": {
+    "employee_id": ["user id", "userid"],
+    "employee_name": ["user name", "name", "user"],
+    "department": ["user group", "department", "group"],
+    "date": ["date", "day"],
+    "shift": ["shift", "schedule"],
+    "check_in": ["first check-in", "check-in", "in"],
+    "check_out": ["last check-out", "check-out", "out"],
+    "worked": ["total work time", "work time", "regular"],
+    "late": ["late"],
+    "early_leave": ["early leave"],
+    "overtime": ["overtime"],
+    "absence": ["absence"],
+    "status": ["attendance status", "status"]
+  }
+}

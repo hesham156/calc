@@ -1,0 +1,128 @@
+from datetime import date, time
+
+from app.models import Attendance, WorkSettings
+from app.services.calculator import compute_day, compute_deduction_minutes
+
+
+def make_settings(**kwargs) -> WorkSettings:
+    s = WorkSettings(
+        work_start=time(8, 0), work_end=time(17, 0), daily_hours=8.0,
+        break_minutes=60, grace_minutes=10, overtime_after=time(17, 0),
+        hourly_rate=10.0, overtime_hourly_rate=15.0,
+        deduction_policy="per_minute", deduction_free_minutes=15,
+        count_early_leave=True, weekend_days=["Friday", "Saturday"],
+    )
+    for k, v in kwargs.items():
+        setattr(s, k, v)
+    return s
+
+
+def make_att(**kwargs) -> Attendance:
+    att = Attendance(employee_id=1, date=date(2026, 7, 20), weekday="Monday")
+    for k, v in kwargs.items():
+        setattr(att, k, v)
+    # SQLAlchemy column defaults only apply on flush — set them manually for unit tests
+    for f in ("out_next_day", "file_absence", "file_leave"):
+        if getattr(att, f) is None:
+            setattr(att, f, False)
+    if att.break_minutes is None:
+        att.break_minutes = 0
+    return att
+
+
+class TestDayComputation:
+    def test_normal_day(self):
+        s = make_settings()
+        att = make_att(check_in=time(8, 0), check_out=time(17, 0))
+        compute_day(att, s)
+        assert att.status == "present"
+        assert att.worked_minutes == 8 * 60  # 9h - 1h break
+        assert att.late_minutes == 0
+        assert att.overtime_minutes == 0
+
+    def test_late_within_grace(self):
+        s = make_settings()
+        att = make_att(check_in=time(8, 9), check_out=time(17, 0))
+        compute_day(att, s)
+        assert att.late_minutes == 0  # within 10 min grace
+
+    def test_late_beyond_grace(self):
+        s = make_settings()
+        att = make_att(check_in=time(8, 25), check_out=time(17, 0))
+        compute_day(att, s)
+        assert att.late_minutes == 25
+        assert att.deduction_minutes == 25
+        assert att.deduction_amount == round(25 / 60 * 10, 2)
+
+    def test_early_leave(self):
+        s = make_settings()
+        att = make_att(check_in=time(8, 0), check_out=time(16, 0))
+        compute_day(att, s)
+        assert att.early_leave_minutes == 60
+
+    def test_overtime(self):
+        s = make_settings()
+        att = make_att(check_in=time(8, 0), check_out=time(19, 30))
+        compute_day(att, s)
+        assert att.overtime_minutes == 150
+        assert att.overtime_amount == round(150 / 60 * 15, 2)
+
+    def test_absent_no_punches(self):
+        s = make_settings()
+        att = make_att()
+        compute_day(att, s)
+        assert att.status == "absent"
+        assert att.worked_minutes == 0
+
+    def test_weekend(self):
+        s = make_settings()
+        att = make_att(date=date(2026, 7, 24))  # Friday
+        compute_day(att, s)
+        assert att.status == "weekend"
+
+    def test_leave_flag(self):
+        s = make_settings()
+        att = make_att(file_leave=True)
+        compute_day(att, s)
+        assert att.status == "leave"
+
+    def test_overnight_shift(self):
+        s = make_settings()
+        att = make_att(check_in=time(22, 0), check_out=time(6, 0), out_next_day=True)
+        compute_day(att, s)
+        assert att.status == "present"
+        assert att.worked_minutes == 7 * 60  # 8h - 1h break
+
+    def test_scheduled_shift_overrides_settings(self):
+        s = make_settings()
+        # employee scheduled 06:00-14:00 -> arriving 06:20 is 20 min late
+        att = make_att(scheduled_in=time(6, 0), scheduled_out=time(14, 0),
+                       check_in=time(6, 20), check_out=time(14, 0))
+        compute_day(att, s)
+        assert att.late_minutes == 20
+
+
+class TestDeductionPolicies:
+    def test_per_minute(self):
+        assert compute_deduction_minutes(30, 0, make_settings()) == 30
+
+    def test_free_then_all_below(self):
+        s = make_settings(deduction_policy="free_then_all", deduction_free_minutes=15)
+        assert compute_deduction_minutes(12, 0, s) == 0
+
+    def test_free_then_all_above(self):
+        s = make_settings(deduction_policy="free_then_all", deduction_free_minutes=15)
+        assert compute_deduction_minutes(20, 0, s) == 20
+
+    def test_round_hour(self):
+        s = make_settings(deduction_policy="round_hour")
+        assert compute_deduction_minutes(61, 0, s) == 120
+        assert compute_deduction_minutes(60, 0, s) == 60
+
+    def test_none(self):
+        s = make_settings(deduction_policy="none")
+        assert compute_deduction_minutes(45, 30, s) == 0
+
+    def test_early_leave_excluded(self):
+        s = make_settings(count_early_leave=False)
+        assert compute_deduction_minutes(10, 50, s) == 10

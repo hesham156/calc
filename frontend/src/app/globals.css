@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 60 7% 97%;
+  --foreground: 0 0% 4%;
+  --card: 60 14% 99%;
+  --card-foreground: 0 0% 4%;
+  --primary: 213 67% 50%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 55 10% 93%;
+  --secondary-foreground: 0 0% 9%;
+  --muted: 55 10% 93%;
+  --muted-foreground: 40 2% 44%;
+  --accent: 213 67% 95%;
+  --accent-foreground: 213 67% 30%;
+  --destructive: 0 73% 58%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 53 12% 87%;
+  --input: 53 12% 82%;
+  --ring: 213 67% 50%;
+
+  /* dataviz palette (validated) */
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --viz-muted: #898781;
+  --grid: #e1e0d9;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply bg-background text-foreground;
+  font-family: "Segoe UI", Tahoma, system-ui, -apple-system, sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-border;
+}

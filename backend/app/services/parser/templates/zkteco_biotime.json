@@ -1,0 +1,30 @@
+{
+  "name": "zkteco_biotime",
+  "label": "ZKTeco BioTime (Total Time Card)",
+  "detection": {
+    "required_any": [["clock in", "clock out"], ["duty duration", "timetable"]],
+    "required_all": ["check in"]
+  },
+  "date_dayfirst": true,
+  "columns": {
+    "employee_id": ["employee id"],
+    "employee_name": ["first name", "last name", "name"],
+    "department": ["department"],
+    "position": ["position"],
+    "date": ["date"],
+    "weekday": ["weekday"],
+    "shift": ["timetable"],
+    "scheduled_in": ["check in"],
+    "scheduled_out": ["check out"],
+    "check_in": ["clock in"],
+    "check_out": ["clock out"],
+    "break_minutes": ["break duration"],
+    "worked": ["worked hours", "total time", "regular(h)"],
+    "late": ["late in(hh:mm)", "late in", "late-arrival(h)"],
+    "early_leave": ["early out(hh:mm)", "early out"],
+    "overtime": ["normal ot(hh:mm)", "normal ot", "ot(hh:mm)"],
+    "absence": ["absence(d)", "absence"],
+    "leave": ["fild(d)", "leave(d)", "leave"],
+    "status": ["status"]
+  }
+}

@@ -1,0 +1,5 @@
+﻿Employee ID,First Name,Department,Position Code,Position,الاماكن,Date,Weekday,Timetable,Check In,Check Out,Duty Duration,Break Duration,Clock In,Clock Out,Worked Hours,Regular(H),Late In(HH:MM),Early Out(HH:MM),FILD(D),Absence(D),Normal OT(HH:MM),LATE-ARRIVAL(H)
+1,مراد,Sales,1000,Manager,,20-07-2026,Monday,,06:00:00,06:00:00,,,,,,,,,,,,
+1,مراد,Sales,1000,Manager,,21-07-2026,Tuesday,,06:00:00,06:00:00,,,,,,,,,,,,
+1,مراد,Sales,1000,Manager,,22-07-2026,Wednesday,ets duty,08:00:00,02:00:00,06:00,,,,,,,,,1.0,,
+1,مراد,Sales,1000,Manager,,23-07-2026,Thursday,ets duty,08:00:00,02:00:00,06:00,,,,,,,,,1.0,,

@@ -1,0 +1,27 @@
+{
+  "name": "zkteco_attlog",
+  "label": "ZKTeco Attendance Log (AC-No)",
+  "detection": {
+    "required_any": [["ac-no", "ac no", "acno"]],
+    "required_all": []
+  },
+  "date_dayfirst": true,
+  "columns": {
+    "employee_id": ["ac-no", "ac no", "acno", "no"],
+    "employee_name": ["name"],
+    "department": ["department"],
+    "date": ["date", "att date"],
+    "weekday": ["weekday", "week"],
+    "shift": ["shift", "timetable"],
+    "check_in": ["clock in", "on duty punch", "c/in", "time in"],
+    "check_out": ["clock out", "off duty punch", "c/out", "time out"],
+    "scheduled_in": ["on duty"],
+    "scheduled_out": ["off duty"],
+    "late": ["late"],
+    "early_leave": ["early"],
+    "overtime": ["ot time", "overtime"],
+    "absence": ["absent"],
+    "worked": ["work time"],
+    "status": ["status"]
+  }
+}
