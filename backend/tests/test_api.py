@@ -1,4 +1,5 @@
 import time as time_mod
+from datetime import date, time
 from pathlib import Path
 
 DATA = Path(__file__).parent / "data"
@@ -70,6 +71,48 @@ def test_full_upload_flow(client):
         r = client.get(f"/api/export/{kind}", params={"employee_id": emp["id"], "year": 2026, "month": 7})
         assert r.status_code == 200, f"{kind}: {r.text[:200]}"
         assert len(r.content) > 100
+
+
+def test_report_day_filters(client):
+    from app.db.database import SessionLocal
+    from app.models import Attendance, Employee
+
+    db = SessionLocal()
+    emp = Employee(code="9001", name="موظف تجريبي")
+    db.add(emp)
+    db.flush()
+    db.add_all([
+        Attendance(employee_id=emp.id, date=date(2026, 7, 1), status="absent"),
+        Attendance(employee_id=emp.id, date=date(2026, 7, 2), status="incomplete", check_in=time(8, 0)),
+        Attendance(employee_id=emp.id, date=date(2026, 7, 3), status="present", late_minutes=25),
+        Attendance(employee_id=emp.id, date=date(2026, 7, 4), status="present", early_leave_minutes=40),
+        Attendance(employee_id=emp.id, date=date(2026, 7, 5), status="present", overtime_minutes=90),
+        Attendance(employee_id=emp.id, date=date(2026, 7, 6), status="present"),
+    ])
+    db.commit()
+    db.close()
+
+    def dates(**params):
+        r = client.get("/api/reports", params={"year": 2026, "month": 7, **params})
+        assert r.status_code == 200, r.text
+        return sorted(row["date"] for row in r.json())
+
+    assert len(dates()) == 6
+    assert dates(flags="absent") == ["2026-07-01"]
+    assert dates(flags="single_punch") == ["2026-07-02"]
+    assert dates(flags="late") == ["2026-07-03"]
+    assert dates(flags="early_leave") == ["2026-07-04"]
+    assert dates(flags="overtime") == ["2026-07-05"]
+    # several flags are OR-combined, and still stack with the other filters
+    assert dates(flags=["late", "overtime"]) == ["2026-07-03", "2026-07-05"]
+    assert dates(flags=["absent", "late"], status="absent") == ["2026-07-01"]
+    assert dates(flags=["late"], q="9001") == ["2026-07-03"]
+
+
+def test_report_rejects_unknown_filter(client):
+    r = client.get("/api/reports", params={"flags": "bogus"})
+    assert r.status_code == 400
+    assert "bogus" in r.json()["detail"]
 
 
 def test_analyze_recompute(client):

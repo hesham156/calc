@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -9,6 +9,15 @@ from app.models import Attendance, Employee
 
 router = APIRouter(prefix="/api", tags=["reports"])
 
+# quick day filters surfaced in the UI; several flags are OR-combined
+DAY_FLAGS = {
+    "absent": Attendance.status == "absent",
+    "single_punch": Attendance.status == "incomplete",  # only one punch that day
+    "late": Attendance.late_minutes > 0,
+    "early_leave": Attendance.early_leave_minutes > 0,
+    "overtime": Attendance.overtime_minutes > 0,
+}
+
 
 @router.get("/reports")
 def reports(
@@ -16,6 +25,7 @@ def reports(
     year: int | None = None,
     month: int | None = Query(None, ge=1, le=12),
     status: str = "",
+    flags: list[str] | None = Query(None, description=f"any of: {', '.join(DAY_FLAGS)}"),
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
@@ -36,6 +46,11 @@ def reports(
         stmt = stmt.where(Attendance.date >= date(year, 1, 1), Attendance.date < date(year + 1, 1, 1))
     if status:
         stmt = stmt.where(Attendance.status == status)
+    if flags:
+        unknown = [f for f in flags if f not in DAY_FLAGS]
+        if unknown:
+            raise HTTPException(400, f"Unknown filter(s): {', '.join(unknown)}. Allowed: {', '.join(DAY_FLAGS)}")
+        stmt = stmt.where(or_(*[DAY_FLAGS[f] for f in flags]))
 
     rows = db.execute(stmt.offset((page - 1) * page_size).limit(page_size)).all()
     return [

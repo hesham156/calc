@@ -3,6 +3,7 @@
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { DayFilters } from "@/components/day-filters";
 import { MonthPicker, useMonths } from "@/components/month-picker";
 import { Shell } from "@/components/shell";
 import { StatusBadge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import type { DayFlag } from "@/lib/filters";
 import type { MonthRef, ReportRow } from "@/lib/types";
 import { fmtMinutes, STATUS_AR } from "@/lib/utils";
 
@@ -26,6 +28,7 @@ function ReportsContent() {
   const [month, setMonth] = useState<MonthRef | null>(null);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
+  const [flags, setFlags] = useState<DayFlag[]>([]);
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,6 +45,7 @@ function ReportsContent() {
     });
     if (q) params.set("q", q);
     if (status) params.set("status", status);
+    for (const f of flags) params.append("flags", f);
     const t = setTimeout(() => {
       api
         .get<ReportRow[]>(`/api/reports?${params}`)
@@ -50,7 +54,7 @@ function ReportsContent() {
         .finally(() => setLoading(false));
     }, 250);
     return () => clearTimeout(t);
-  }, [month, q, status]);
+  }, [month, q, status, flags]);
 
   return (
     <div className="space-y-6">
@@ -76,6 +80,8 @@ function ReportsContent() {
           ))}
         </Select>
       </div>
+
+      <DayFilters value={flags} onChange={setFlags} />
 
       <Card>
         <CardContent className="p-0">

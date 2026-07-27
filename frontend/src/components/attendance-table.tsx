@@ -10,9 +10,11 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { ArrowUpDown } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { DayFilters } from "@/components/day-filters";
 import { StatusBadge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { countByFlag, type DayFlag, matchesFlags } from "@/lib/filters";
 import type { AttendanceDay } from "@/lib/types";
 import { fmtMinutes, WEEKDAYS_AR } from "@/lib/utils";
 
@@ -97,9 +99,13 @@ const columns: ColumnDef<AttendanceDay>[] = [
 export function AttendanceTable({ days }: { days: AttendanceDay[] }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [filter, setFilter] = useState("");
+  const [flags, setFlags] = useState<DayFlag[]>([]);
+
+  const counts = useMemo(() => countByFlag(days), [days]);
+  const rows = useMemo(() => days.filter((d) => matchesFlags(d, flags)), [days, flags]);
 
   const table = useReactTable({
-    data: days,
+    data: rows,
     columns,
     state: { sorting, globalFilter: filter },
     onSortingChange: setSorting,
@@ -117,6 +123,7 @@ export function AttendanceTable({ days }: { days: AttendanceDay[] }) {
         onChange={(e) => setFilter(e.target.value)}
         className="max-w-xs"
       />
+      <DayFilters value={flags} onChange={setFlags} counts={counts} />
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full min-w-[800px] text-sm">
           <thead className="bg-secondary/60">
