@@ -32,6 +32,9 @@ export interface AttendanceDay {
   date: string;
   weekday: string;
   shift: string;
+  /** the shift window this row was judged against */
+  work_start: string;
+  work_end: string;
   check_in: string | null;
   check_out: string | null;
   out_next_day: boolean;

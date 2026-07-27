@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_work_settings
 from app.db.database import get_db
 from app.models import Attendance, Employee
+from app.services.calculator import effective_work_window
 
 router = APIRouter(prefix="/api", tags=["reports"])
 
@@ -53,24 +55,29 @@ def reports(
         stmt = stmt.where(or_(*[DAY_FLAGS[f] for f in flags]))
 
     rows = db.execute(stmt.offset((page - 1) * page_size).limit(page_size)).all()
-    return [
-        {
-            "id": a.id,
-            "employee_id": e.id,
-            "employee_name": e.name,
-            "employee_code": e.code,
-            "date": a.date.isoformat(),
-            "weekday": a.weekday,
-            "check_in": a.check_in.strftime("%H:%M") if a.check_in else None,
-            "check_out": a.check_out.strftime("%H:%M") if a.check_out else None,
-            "out_next_day": a.out_next_day,
-            "worked_minutes": a.worked_minutes,
-            "late_minutes": a.late_minutes,
-            "early_leave_minutes": a.early_leave_minutes,
-            "overtime_minutes": a.overtime_minutes,
-            "deduction_minutes": a.deduction_minutes,
-            "deduction_amount": a.deduction_amount,
-            "status": a.status,
-        }
-        for a, e in rows
-    ]
+    ws = get_work_settings(db)
+    return [_row_out(a, e, ws) for a, e in rows]
+
+
+def _row_out(a: Attendance, e: Employee, ws) -> dict:
+    work_start, work_end = effective_work_window(a, ws)
+    return {
+        "id": a.id,
+        "employee_id": e.id,
+        "employee_name": e.name,
+        "employee_code": e.code,
+        "date": a.date.isoformat(),
+        "weekday": a.weekday,
+        "work_start": work_start.strftime("%H:%M"),
+        "work_end": work_end.strftime("%H:%M"),
+        "check_in": a.check_in.strftime("%H:%M") if a.check_in else None,
+        "check_out": a.check_out.strftime("%H:%M") if a.check_out else None,
+        "out_next_day": a.out_next_day,
+        "worked_minutes": a.worked_minutes,
+        "late_minutes": a.late_minutes,
+        "early_leave_minutes": a.early_leave_minutes,
+        "overtime_minutes": a.overtime_minutes,
+        "deduction_minutes": a.deduction_minutes,
+        "deduction_amount": a.deduction_amount,
+        "status": a.status,
+    }

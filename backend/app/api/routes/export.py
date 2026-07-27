@@ -59,7 +59,7 @@ def export_report(
     elif kind == "excel":
         content = export_excel(emp, rows, summary, year, month, ws)
     else:
-        content = export_csv(emp, rows, summary)
+        content = export_csv(emp, rows, summary, ws)
 
     db.add(Report(employee_id=employee_id, year=year, month=month, kind=kind, file_path=""))
     db.commit()

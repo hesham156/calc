@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_work_settings
 from app.db.database import get_db
 from app.models import Attendance, AttendanceSummary, Employee
+from app.services.calculator import effective_work_window
 from app.schemas import AttendanceDayOut, EmployeeOut, EmployeeWithSummary, MonthOut, SummaryOut
 
 router = APIRouter(prefix="/api", tags=["employees"])
@@ -69,11 +71,16 @@ def employee_attendance(
 ):
     start = date(year, month, 1)
     end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
-    return db.scalars(
+    rows = db.scalars(
         select(Attendance)
         .where(Attendance.employee_id == employee_id, Attendance.date >= start, Attendance.date < end)
         .order_by(Attendance.date)
     ).all()
+    ws = get_work_settings(db)
+    for row in rows:
+        # plain instance attributes (not mapped columns) read by the response model
+        row.work_start, row.work_end = effective_work_window(row, ws)
+    return rows
 
 
 @router.get("/employees/{employee_id}/summary", response_model=SummaryOut | None)

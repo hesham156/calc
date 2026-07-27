@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DayFilters } from "@/components/day-filters";
 import { MonthPicker, useMonths } from "@/components/month-picker";
 import { Shell } from "@/components/shell";
@@ -13,7 +13,7 @@ import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import type { DayFlag } from "@/lib/filters";
 import type { MonthRef, ReportRow } from "@/lib/types";
-import { fmtMinutes, STATUS_AR } from "@/lib/utils";
+import { fmtMinutes, fmtTime, STATUS_AR } from "@/lib/utils";
 
 export default function ReportsPage() {
   return (
@@ -31,6 +31,23 @@ function ReportsContent() {
   const [flags, setFlags] = useState<DayFlag[]>([]);
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const totals = useMemo(
+    () =>
+      rows.reduce(
+        (acc, r) => ({
+          count: acc.count + 1,
+          worked: acc.worked + r.worked_minutes,
+          late: acc.late + r.late_minutes,
+          early: acc.early + r.early_leave_minutes,
+          overtime: acc.overtime + r.overtime_minutes,
+          deductionMinutes: acc.deductionMinutes + r.deduction_minutes,
+          deductionAmount: acc.deductionAmount + r.deduction_amount,
+        }),
+        { count: 0, worked: 0, late: 0, early: 0, overtime: 0, deductionMinutes: 0, deductionAmount: 0 }
+      ),
+    [rows]
+  );
 
   useEffect(() => {
     if (months.length > 0 && !month) setMonth(months[0]);
@@ -86,10 +103,10 @@ function ReportsContent() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[1080px] text-sm">
               <thead className="bg-secondary/60">
                 <tr>
-                  {["الموظف", "التاريخ", "الدخول", "الخروج", "مدة العمل", "التأخير", "انصراف مبكر", "أوفر تايم", "الخصم", "الحالة"].map((h) => (
+                  {["الموظف", "التاريخ", "بداية الدوام", "نهاية الدوام", "الدخول", "الخروج", "مدة العمل", "التأخير", "انصراف مبكر", "أوفر تايم", "الخصم", "الحالة"].map((h) => (
                     <th key={h} className="whitespace-nowrap px-3 py-2.5 text-right font-semibold">{h}</th>
                   ))}
                 </tr>
@@ -104,6 +121,8 @@ function ReportsContent() {
                       <span className="mr-1 text-xs text-muted-foreground">#{r.employee_code}</span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 tabular-nums">{r.date}</td>
+                    <td className="px-3 py-2 tabular-nums text-muted-foreground">{fmtTime(r.work_start)}</td>
+                    <td className="px-3 py-2 tabular-nums text-muted-foreground">{fmtTime(r.work_end)}</td>
                     <td className="px-3 py-2 tabular-nums">{r.check_in ?? "—"}</td>
                     <td className="px-3 py-2 tabular-nums">{r.check_out ? `${r.check_out}${r.out_next_day ? "+1" : ""}` : "—"}</td>
                     <td className="px-3 py-2 tabular-nums">{fmtMinutes(r.worked_minutes)}</td>
@@ -118,10 +137,30 @@ function ReportsContent() {
                 ))}
                 {!loading && rows.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="px-3 py-10 text-center text-muted-foreground">لا توجد سجلات</td>
+                    <td colSpan={12} className="px-3 py-10 text-center text-muted-foreground">لا توجد سجلات</td>
                   </tr>
                 )}
               </tbody>
+              {rows.length > 0 && (
+                <tfoot className="border-t-2 bg-secondary/60 font-semibold">
+                  <tr>
+                    <td className="whitespace-nowrap px-3 py-2.5">الإجمالي</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">{totals.count} سجل</td>
+                    <td colSpan={4} />
+                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">{fmtMinutes(totals.worked)}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-[#9c3c14]">{totals.late} د</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">{totals.early} د</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-[#006300]">
+                      {fmtMinutes(totals.overtime)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">
+                      {totals.deductionMinutes} د
+                      {totals.deductionAmount > 0 && ` (${totals.deductionAmount.toFixed(2)})`}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </CardContent>

@@ -72,6 +72,9 @@ class AttendanceDayOut(BaseModel):
     date: date
     weekday: str
     shift: str
+    # the shift window this row was actually judged against
+    work_start: time
+    work_end: time
     check_in: time | None
     check_out: time | None
     out_next_day: bool

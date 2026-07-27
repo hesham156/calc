@@ -17,6 +17,11 @@ export function fmtHours(m: number): string {
   return `${(m / 60).toFixed(1)} س`;
 }
 
+/** "08:00:00" -> "08:00" */
+export function fmtTime(t: string | null | undefined): string {
+  return t ? t.slice(0, 5) : "—";
+}
+
 export const STATUS_AR: Record<string, string> = {
   present: "حاضر",
   absent: "غائب",

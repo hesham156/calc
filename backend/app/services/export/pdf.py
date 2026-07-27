@@ -13,7 +13,8 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.models import Attendance, AttendanceSummary, Employee, WorkSettings
-from app.services.export.excel import HEADERS, STATUS_AR, fmt_minutes, fmt_time, summary_rows
+from app.services.calculator import effective_work_window
+from app.services.export.excel import HEADERS, STATUS_AR, fmt_minutes, fmt_time, summary_rows, totals_row
 
 _FONT_NAME = "Helvetica"
 _ARABIC_OK = False
@@ -67,8 +68,10 @@ def export_pdf(
     header_row = [ar(h) for h in HEADERS][::-1]
     data = [header_row]
     for a in rows:
+        work_start, work_end = effective_work_window(a, work_settings)
         row = [
             a.date.strftime("%Y-%m-%d"), ar(a.weekday), ar(a.shift or "-"),
+            fmt_time(work_start), fmt_time(work_end),
             fmt_time(a.check_in), fmt_time(a.check_out) + ("+1" if a.out_next_day else ""),
             fmt_minutes(a.worked_minutes), fmt_minutes(a.late_minutes),
             fmt_minutes(a.early_leave_minutes), fmt_minutes(a.overtime_minutes),
@@ -76,13 +79,17 @@ def export_pdf(
         ]
         data.append(row[::-1])
 
+    data.append([ar(str(v)) for v in totals_row(rows)][::-1])
+
     table = Table(data, repeatRows=1)
     table.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), _FONT_NAME),
         ("FONTSIZE", (0, 0), (-1, -1), 8),
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E293B")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F1F5F9")]),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#F1F5F9")]),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E2E8F0")),
+        ("FONTSIZE", (0, -1), (-1, -1), 9),
         ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#CBD5E1")),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),

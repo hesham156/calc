@@ -16,7 +16,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { countByFlag, type DayFlag, matchesFlags } from "@/lib/filters";
 import type { AttendanceDay } from "@/lib/types";
-import { fmtMinutes, WEEKDAYS_AR } from "@/lib/utils";
+import { fmtMinutes, fmtTime, WEEKDAYS_AR } from "@/lib/utils";
 
 function sortableHeader(label: string) {
   // eslint-disable-next-line react/display-name
@@ -38,12 +38,29 @@ const columns: ColumnDef<AttendanceDay>[] = [
     header: "اليوم",
     cell: ({ row }) => WEEKDAYS_AR[row.original.weekday] ?? row.original.weekday,
   },
-  { accessorKey: "check_in", header: "الدخول", cell: ({ row }) => row.original.check_in ?? "—" },
+  {
+    accessorKey: "work_start",
+    header: "بداية الدوام",
+    cell: ({ row }) => <span className="tabular-nums text-muted-foreground">{fmtTime(row.original.work_start)}</span>,
+  },
+  {
+    accessorKey: "work_end",
+    header: "نهاية الدوام",
+    cell: ({ row }) => <span className="tabular-nums text-muted-foreground">{fmtTime(row.original.work_end)}</span>,
+  },
+  {
+    accessorKey: "check_in",
+    header: "الدخول",
+    cell: ({ row }) => <span className="tabular-nums">{fmtTime(row.original.check_in)}</span>,
+  },
   {
     accessorKey: "check_out",
     header: "الخروج",
-    cell: ({ row }) =>
-      row.original.check_out ? `${row.original.check_out}${row.original.out_next_day ? "+1" : ""}` : "—",
+    cell: ({ row }) => (
+      <span className="tabular-nums">
+        {row.original.check_out ? `${fmtTime(row.original.check_out)}${row.original.out_next_day ? "+1" : ""}` : "—"}
+      </span>
+    ),
   },
   {
     accessorKey: "worked_minutes",
@@ -96,6 +113,22 @@ const columns: ColumnDef<AttendanceDay>[] = [
   { accessorKey: "status", header: "الحالة", cell: ({ row }) => <StatusBadge status={row.original.status} /> },
 ];
 
+/** Totals of whatever rows the table is currently showing. */
+function sumDays(days: AttendanceDay[]) {
+  return days.reduce(
+    (acc, d) => ({
+      count: acc.count + 1,
+      worked: acc.worked + d.worked_minutes,
+      late: acc.late + d.late_minutes,
+      early: acc.early + d.early_leave_minutes,
+      overtime: acc.overtime + d.overtime_minutes,
+      deductionMinutes: acc.deductionMinutes + d.deduction_minutes,
+      deductionAmount: acc.deductionAmount + d.deduction_amount,
+    }),
+    { count: 0, worked: 0, late: 0, early: 0, overtime: 0, deductionMinutes: 0, deductionAmount: 0 }
+  );
+}
+
 export function AttendanceTable({ days }: { days: AttendanceDay[] }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [filter, setFilter] = useState("");
@@ -115,6 +148,9 @@ export function AttendanceTable({ days }: { days: AttendanceDay[] }) {
     getFilteredRowModel: getFilteredRowModel(),
   });
 
+  const visible = table.getRowModel().rows;
+  const totals = sumDays(visible.map((r) => r.original));
+
   return (
     <div className="space-y-3">
       <Input
@@ -125,7 +161,7 @@ export function AttendanceTable({ days }: { days: AttendanceDay[] }) {
       />
       <DayFilters value={flags} onChange={setFlags} counts={counts} />
       <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full min-w-[800px] text-sm">
+        <table className="w-full min-w-[980px] text-sm">
           <thead className="bg-secondary/60">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
@@ -147,7 +183,7 @@ export function AttendanceTable({ days }: { days: AttendanceDay[] }) {
                 ))}
               </tr>
             ))}
-            {table.getRowModel().rows.length === 0 && (
+            {visible.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className="px-3 py-8 text-center text-muted-foreground">
                   لا توجد سجلات
@@ -155,6 +191,26 @@ export function AttendanceTable({ days }: { days: AttendanceDay[] }) {
               </tr>
             )}
           </tbody>
+          {visible.length > 0 && (
+            <tfoot className="border-t-2 bg-secondary/60 font-semibold">
+              <tr>
+                <td className="whitespace-nowrap px-3 py-2.5">الإجمالي</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-muted-foreground">{totals.count} يوم</td>
+                <td colSpan={4} />
+                <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">{fmtMinutes(totals.worked)}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-[#9c3c14]">{totals.late} د</td>
+                <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">{totals.early} د</td>
+                <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-[#006300]">
+                  {fmtMinutes(totals.overtime)}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5 tabular-nums">
+                  {totals.deductionMinutes} د
+                  {totals.deductionAmount > 0 && ` (${totals.deductionAmount.toFixed(2)})`}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>

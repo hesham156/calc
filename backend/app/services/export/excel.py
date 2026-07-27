@@ -7,6 +7,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 from app.models import Attendance, AttendanceSummary, Employee, WorkSettings
+from app.services.calculator import effective_work_window
 
 STATUS_AR = {
     "present": "حاضر", "absent": "غائب", "leave": "إجازة",
@@ -14,7 +15,7 @@ STATUS_AR = {
 }
 
 HEADERS = [
-    "التاريخ", "اليوم", "الوردية", "الدخول", "الخروج", "مدة العمل",
+    "التاريخ", "اليوم", "الوردية", "بداية الدوام", "نهاية الدوام", "الدخول", "الخروج", "مدة العمل",
     "التأخير", "انصراف مبكر", "أوفر تايم", "الخصم (دقائق)", "الخصم (مبلغ)", "الحالة",
 ]
 
@@ -27,13 +28,29 @@ def fmt_time(t) -> str:
     return t.strftime("%H:%M") if t else "-"
 
 
-def row_values(a: Attendance) -> list:
+def row_values(a: Attendance, work_settings: WorkSettings) -> list:
+    work_start, work_end = effective_work_window(a, work_settings)
     return [
         a.date.strftime("%Y-%m-%d"), a.weekday, a.shift or "-",
+        fmt_time(work_start), fmt_time(work_end),
         fmt_time(a.check_in), fmt_time(a.check_out) + ("+1" if a.out_next_day else ""),
         fmt_minutes(a.worked_minutes), fmt_minutes(a.late_minutes),
         fmt_minutes(a.early_leave_minutes), fmt_minutes(a.overtime_minutes),
         a.deduction_minutes, a.deduction_amount, STATUS_AR.get(a.status, a.status),
+    ]
+
+
+def totals_row(rows: list[Attendance]) -> list:
+    """Grand-total line closing the detail table."""
+    return [
+        "الإجمالي", f"{len(rows)} يوم", "", "", "", "", "",
+        fmt_minutes(sum(a.worked_minutes for a in rows)),
+        fmt_minutes(sum(a.late_minutes for a in rows)),
+        fmt_minutes(sum(a.early_leave_minutes for a in rows)),
+        fmt_minutes(sum(a.overtime_minutes for a in rows)),
+        sum(a.deduction_minutes for a in rows),
+        round(sum(a.deduction_amount for a in rows), 2),
+        "",
     ]
 
 
@@ -57,12 +74,16 @@ def summary_rows(s: AttendanceSummary | None) -> list[tuple[str, str]]:
     ]
 
 
-def export_csv(employee: Employee, rows: list[Attendance], summary: AttendanceSummary | None) -> bytes:
+def export_csv(
+    employee: Employee, rows: list[Attendance], summary: AttendanceSummary | None,
+    work_settings: WorkSettings,
+) -> bytes:
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(HEADERS)
     for a in rows:
-        w.writerow(row_values(a))
+        w.writerow(row_values(a, work_settings))
+    w.writerow(totals_row(rows))
     w.writerow([])
     for label, value in summary_rows(summary):
         w.writerow([label, value])
@@ -85,11 +106,11 @@ def export_excel(
     center = Alignment(horizontal="center", vertical="center")
 
     company = work_settings.company_name or "تقرير الحضور والانصراف"
-    ws.merge_cells("A1:L1")
+    ws.merge_cells("A1:N1")
     ws["A1"] = company
     ws["A1"].font = Font(bold=True, size=14)
     ws["A1"].alignment = center
-    ws.merge_cells("A2:L2")
+    ws.merge_cells("A2:N2")
     ws["A2"] = f"الموظف: {employee.name} ({employee.code}) — الشهر: {year}-{month:02d}"
     ws["A2"].alignment = center
 
@@ -102,10 +123,17 @@ def export_excel(
         cell.border = border
 
     for a in rows:
-        ws.append(row_values(a))
+        ws.append(row_values(a, work_settings))
         for cell in ws[ws.max_row]:
             cell.border = border
             cell.alignment = center
+
+    ws.append(totals_row(rows))
+    for cell in ws[ws.max_row]:
+        cell.border = border
+        cell.alignment = center
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill("solid", fgColor="E2E8F0")
 
     ws.append([])
     for label, value in summary_rows(summary):
@@ -115,7 +143,7 @@ def export_excel(
     ws.append([])
     ws.append(["التوقيع: ______________________", "", "", "", "اعتماد المدير: ______________________"])
 
-    for col, width in zip("ABCDEFGHIJKL", [12, 10, 12, 8, 8, 10, 9, 12, 10, 12, 12, 12]):
+    for col, width in zip("ABCDEFGHIJKLMN", [12, 10, 12, 12, 12, 8, 8, 10, 9, 12, 10, 12, 12, 12]):
         ws.column_dimensions[col].width = width
 
     buf = io.BytesIO()

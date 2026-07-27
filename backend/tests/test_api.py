@@ -109,6 +109,41 @@ def test_report_day_filters(client):
     assert dates(flags=["late"], q="9001") == ["2026-07-03"]
 
 
+def test_rows_expose_the_shift_window_they_were_judged_against(client):
+    from app.db.database import SessionLocal
+    from app.models import Attendance, Employee
+
+    db = SessionLocal()
+    emp = Employee(code="9002", name="ورديتان")
+    db.add(emp)
+    db.flush()
+    db.add_all([
+        # own schedule from the file
+        Attendance(employee_id=emp.id, date=date(2026, 7, 1), status="present",
+                   scheduled_in=time(10, 0), scheduled_out=time(19, 0),
+                   check_in=time(10, 0), check_out=time(19, 0)),
+        # unusable placeholder -> falls back to the configured work day
+        Attendance(employee_id=emp.id, date=date(2026, 7, 2), status="present",
+                   scheduled_in=time(6, 0), scheduled_out=time(6, 0),
+                   check_in=time(8, 0), check_out=time(17, 0)),
+    ])
+    db.commit()
+    emp_id = emp.id
+    db.close()
+
+    settings = client.get("/api/settings").json()
+    rows = {r["date"]: r for r in client.get("/api/reports", params={"year": 2026, "month": 7}).json()}
+    assert (rows["2026-07-01"]["work_start"], rows["2026-07-01"]["work_end"]) == ("10:00", "19:00")
+    assert rows["2026-07-02"]["work_start"] == settings["work_start"][:5]
+    assert rows["2026-07-02"]["work_end"] == settings["work_end"][:5]
+
+    days = {d["date"]: d for d in
+            client.get(f"/api/employees/{emp_id}/attendance", params={"year": 2026, "month": 7}).json()}
+    assert days["2026-07-01"]["work_start"] == "10:00:00"
+    assert days["2026-07-01"]["work_end"] == "19:00:00"
+    assert days["2026-07-02"]["work_start"] == settings["work_start"]
+
+
 def test_report_rejects_unknown_filter(client):
     r = client.get("/api/reports", params={"flags": "bogus"})
     assert r.status_code == 400
