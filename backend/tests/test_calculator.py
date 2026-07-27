@@ -101,6 +101,30 @@ class TestDayComputation:
         compute_day(att, s)
         assert att.late_minutes == 20
 
+    def test_scheduled_shift_drives_overtime(self):
+        s = make_settings()
+        # scheduled 10:00-19:00: leaving at 19:00 is a normal day, not 2h of
+        # overtime against the 17:00 threshold meant for the 08:00 shift
+        att = make_att(scheduled_in=time(10, 0), scheduled_out=time(19, 0),
+                       check_in=time(10, 0), check_out=time(19, 0))
+        compute_day(att, s)
+        assert att.overtime_minutes == 0
+        assert att.early_leave_minutes == 0
+        # and an hour past that schedule is one hour of overtime
+        att = make_att(scheduled_in=time(10, 0), scheduled_out=time(19, 0),
+                       check_in=time(10, 0), check_out=time(20, 0))
+        compute_day(att, s)
+        assert att.overtime_minutes == 60
+
+    def test_no_overtime_and_early_leave_on_the_same_day(self):
+        s = make_settings()
+        # scheduled 10:00-19:00, left at 18:00 -> 1h early, never also overtime
+        att = make_att(scheduled_in=time(10, 0), scheduled_out=time(19, 0),
+                       check_in=time(10, 0), check_out=time(18, 0))
+        compute_day(att, s)
+        assert att.early_leave_minutes == 60
+        assert att.overtime_minutes == 0
+
     def test_placeholder_schedule_falls_back_to_settings(self):
         s = make_settings()
         # device writes 06:00 -> 06:00 on days with no timetable: a zero-length
@@ -118,6 +142,38 @@ class TestDayComputation:
                        check_in=time(9, 0), check_out=time(17, 0))
         compute_day(att, s)
         assert att.late_minutes == 60  # 09:00 vs the configured 08:00 start
+
+
+class TestFileReportedValuesAreIgnored:
+    """Only the shift window and the punches drive the numbers."""
+
+    def test_file_late_does_not_override_computed(self):
+        s = make_settings()
+        # device claims 90 late minutes; the punch is on time against 08:00
+        att = make_att(check_in=time(8, 0), check_out=time(17, 0), file_late_minutes=90)
+        compute_day(att, s)
+        assert att.late_minutes == 0
+
+    def test_file_overtime_and_early_are_ignored(self):
+        s = make_settings()
+        att = make_att(check_in=time(8, 0), check_out=time(17, 0),
+                       file_overtime_minutes=120, file_early_minutes=45)
+        compute_day(att, s)
+        assert att.overtime_minutes == 0
+        assert att.early_leave_minutes == 0
+
+    def test_file_worked_does_not_fill_a_day_without_punches(self):
+        s = make_settings()
+        att = make_att(file_worked_minutes=480)
+        compute_day(att, s)
+        assert att.status == "absent"
+        assert att.worked_minutes == 0
+
+    def test_absence_and_leave_flags_are_still_honoured(self):
+        s = make_settings()
+        att = make_att(file_leave=True)
+        compute_day(att, s)
+        assert att.status == "leave"
 
 
 class TestDeductionPolicies:

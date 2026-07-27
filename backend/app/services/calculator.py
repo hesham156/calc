@@ -48,6 +48,26 @@ def compute_deduction_minutes(late: int, early: int, s: WorkSettings) -> int:
     return base
 
 
+def has_own_schedule(att: Attendance) -> bool:
+    """True when the file gave this row a usable shift window of its own."""
+    return bool(att.scheduled_in and att.scheduled_out and att.scheduled_in < att.scheduled_out)
+
+
+def effective_work_window(att: Attendance, s: WorkSettings) -> tuple[time, time]:
+    """The shift start/end this row is judged against.
+
+    The per-day schedule exported by the device wins when it forms a valid
+    same-day window. Devices write placeholders on unscheduled days (e.g.
+    06:00 -> 06:00) and reversed windows on some shifts; reading those as a real
+    schedule inflated the late minutes, so anything unusable falls back to the
+    configured work day. Used both by the calculator and by the API, so the
+    times shown in the tables are exactly the ones the numbers came from.
+    """
+    if has_own_schedule(att):
+        return att.scheduled_in, att.scheduled_out
+    return s.work_start, s.work_end
+
+
 def compute_day(att: Attendance, s: WorkSettings) -> None:
     """Fill the derived fields of one attendance row in place."""
     weekday = att.date.strftime("%A")
@@ -74,9 +94,12 @@ def compute_day(att: Attendance, s: WorkSettings) -> None:
     # valid same-day window. Devices write placeholders on unscheduled days (e.g.
     # 06:00 -> 06:00), and reading those as a 06:00 start inflated the late
     # minutes; anything unusable falls back to the configured work day.
-    work_start, work_end = s.work_start, s.work_end
-    if att.scheduled_in and att.scheduled_out and att.scheduled_in < att.scheduled_out:
-        work_start, work_end = att.scheduled_in, att.scheduled_out
+    work_start, work_end = effective_work_window(att, s)
+    # Overtime is measured from the end of that row's own work day, so an
+    # employee scheduled 10:00-19:00 does not collect overtime from the moment
+    # the 08:00 crowd goes home. The configured threshold is the fallback for
+    # rows that carry no schedule of their own.
+    overtime_after = work_end if has_own_schedule(att) else s.overtime_after
 
     late = early = worked = overtime = 0
     break_minutes = att.break_minutes or 0
@@ -95,25 +118,20 @@ def compute_day(att: Attendance, s: WorkSettings) -> None:
         if not att.out_next_day:
             early = max(0, _minutes(work_end) - _minutes(att.check_out))
 
-        # overtime: worked time after the configured overtime threshold
+        # overtime: worked time after the end of this row's work day
         if att.out_next_day:
-            overtime = _duration_minutes(s.overtime_after, att.check_out, True)
-        elif _minutes(att.check_out) > _minutes(s.overtime_after):
-            overtime = _minutes(att.check_out) - _minutes(s.overtime_after)
+            overtime = _duration_minutes(overtime_after, att.check_out, True)
+        elif _minutes(att.check_out) > _minutes(overtime_after):
+            overtime = _minutes(att.check_out) - _minutes(overtime_after)
 
-    # prefer values reported by the device file when the punch data is missing
-    if att.file_worked_minutes is not None and worked == 0:
-        worked = att.file_worked_minutes
-    if att.file_late_minutes is not None and late == 0 and att.file_late_minutes > s.grace_minutes:
-        late = att.file_late_minutes
-    if att.file_early_minutes is not None and early == 0:
-        early = att.file_early_minutes
-    if att.file_overtime_minutes is not None and overtime == 0:
-        overtime = att.file_overtime_minutes
+    # Everything above is derived from the shift window and the punches alone.
+    # The late/early/overtime/worked columns the device writes into the file are
+    # deliberately ignored: they are computed against the device's own rules and
+    # contradicted the schedule we calculate from. file_absence / file_leave are
+    # still honoured (in the status block) since no punch pattern implies them.
 
     if att.status not in ("present", "incomplete"):
-        late = early = overtime = 0
-        worked = worked if att.status == "leave" and worked else 0
+        late = early = overtime = worked = 0
         break_minutes = 0
 
     ded_minutes = compute_deduction_minutes(late, early, s)
