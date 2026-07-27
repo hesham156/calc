@@ -29,8 +29,13 @@ git push origin main
 
 في إعدادات الخدمة → **Settings**:
 
-- **Root Directory** = `backend`
+- **Source** → **Root Directory** = `/backend`
+- **Config-as-code** → **Railway Config File** = `/backend/railway.json`
 - **Networking** → **Generate Domain** (لازم قبل ضبط المتغيرات)
+
+> ⚠️ الإعدادان مطلوبان معاً. **Root Directory** يحدد الملفات التي تُسحب وسياق البناء — بدونه يفحص Railway جذر الريبو، لا يجد `Dockerfile`، ويفشل بـ
+> `Railpack could not determine how to build the app`.
+> و**مسار ملف الإعدادات لا يتبع Root Directory** — لازم مسار مطلق، وإلا يُتجاهَل الـ healthcheck.
 
 ثم **Variables**:
 
@@ -57,7 +62,8 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 **+ New** → **GitHub Repo** → نفس الريبو. ثم **Settings**:
 
-- **Root Directory** = `frontend`
+- **Source** → **Root Directory** = `/frontend`
+- **Config-as-code** → **Railway Config File** = `/frontend/railway.json`
 - **Networking** → **Generate Domain**
 
 ثم **Variables**:
@@ -86,6 +92,31 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 **البيانات التجريبية (`app/db/seed.py`) للتطوير فقط** — تنشئ `admin@example.com / admin123` بكلمة مرور معروفة وموظفين وهميين. لا تشغّلها على الإنتاج.
 
 **التكلفة.** الخطة المجانية عندها حد شهري؛ ثلاث خدمات (backend + frontend + Postgres) تستهلك أسرع من خدمة واحدة.
+
+**تقليل عمليات البناء غير الضرورية.** لأن الخدمتين من نفس الريبو، أي `push` يعيد بناء الاثنتين. من **Settings** → **Watch Paths** ضع `/backend/**` لخدمة الباك إند و `/frontend/**` للواجهة.
+
+---
+
+## حل المشاكل
+
+### `Railpack could not determine how to build the app`
+
+اللوج يعرض ملفات جذر الريبو (`docker-compose.yml`, `.gitignore` …) بدل ملفات الخدمة.
+**السبب:** الـ **Root Directory** غير مضبوط، فلم يجد Railway الـ `Dockerfile`.
+**الحل:** اضبطه على `/backend` أو `/frontend` كما في الخطوات أعلاه، ثم **Redeploy**.
+
+### الموقع يفتح لكن بلا بيانات / أخطاء شبكة في الـ console
+
+`NEXT_PUBLIC_API_URL` لم يُضبط **قبل** البناء، فالواجهة تنادي `http://localhost:8000`.
+**الحل:** اضبط المتغير ثم **Redeploy** للواجهة (تغيير المتغير وحده لا يكفي).
+
+### خطأ CORS في المتصفح
+
+`CORS_ORIGINS` في الباك إند لا يطابق دومين الواجهة. لاحظ: بدون `/` في النهاية، ومع `https://`.
+
+### `Application failed to respond`
+
+الخدمة لا تستمع على `$PORT`. الـ Dockerfiles هنا معالِجة لذلك بالفعل — تأكد أن Railway يبني من الـ Dockerfile وليس Railpack.
 
 ---
 
