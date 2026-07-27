@@ -1,4 +1,4 @@
-"""Seed the database with a demo admin user, employees and one month of attendance.
+"""Seed the database with demo employees and one month of attendance.
 
 Run:  python -m app.db.seed
 """
@@ -7,9 +7,8 @@ from datetime import date, time, timedelta
 
 from sqlalchemy import select
 
-from app.core.security import hash_password
 from app.db.database import Base, SessionLocal, engine
-from app.models import Attendance, Employee, User, WorkSettings
+from app.models import Attendance, Employee, WorkSettings
 from app.services.calculator import compute_day, rebuild_summaries
 
 DEMO_EMPLOYEES = [
@@ -25,15 +24,6 @@ def seed() -> None:
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        if db.scalar(select(User).where(User.email == "admin@example.com")) is None:
-            db.add(User(
-                email="admin@example.com",
-                hashed_password=hash_password("admin123"),
-                full_name="Admin",
-                role="admin",
-            ))
-            print("Created admin@example.com / admin123")
-
         ws = db.scalar(select(WorkSettings))
         if ws is None:
             ws = WorkSettings(hourly_rate=10.0, overtime_hourly_rate=15.0, company_name="Demo Company")

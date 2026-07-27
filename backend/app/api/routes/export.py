@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_work_settings
+from app.api.deps import get_work_settings
 from app.db.database import get_db
-from app.models import Attendance, AttendanceSummary, Employee, Report, User
+from app.models import Attendance, AttendanceSummary, Employee, Report
 from app.services.export.excel import export_csv, export_excel
 from app.services.export.pdf import export_pdf
 
@@ -48,7 +48,6 @@ def export_report(
     year: int,
     month: int = Query(ge=1, le=12),
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
     if kind not in MEDIA:
         raise HTTPException(404, "Unknown export format (pdf | excel | csv)")

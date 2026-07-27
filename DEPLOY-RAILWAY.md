@@ -42,18 +42,11 @@ git push origin main
 | المتغير | القيمة |
 |---------|--------|
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
-| `SECRET_KEY` | نص عشوائي طويل — انظر الأمر بالأسفل |
 | `CORS_ORIGINS` | `https://${{frontend.RAILWAY_PUBLIC_DOMAIN}}` |
 | `UPLOAD_DIR` | `/data/uploads` |
 | `EXPORT_DIR` | `/data/exports` |
 | `COMPANY_NAME` | اسم شركتك |
 | `MAX_UPLOAD_MB` | `50` |
-
-لتوليد `SECRET_KEY` (نفّذه محلياً والصق الناتج في Railway فقط — لا تضعه في الريبو):
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
 
 **Volume للملفات المرفوعة:** الملفات على Railway تُمسح مع كل إعادة نشر. من الخدمة → **+ Volume** → **Mount path** = `/data`.
 (البيانات المستخرجة من الملفات تُخزَّن في Postgres، فالـ Volume لحفظ الملفات الأصلية فقط.)
@@ -80,8 +73,9 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 بعد ضبط المتغيرات: **Redeploy** للخدمتين (الـ frontend إلزامي).
 
-افتح دومين الـ frontend → **سجّل الآن** → **أول حساب يُسجَّل يصبح admin تلقائياً**
-(انظر [auth.py:23](backend/app/api/routes/auth.py#L23)). أي حساب بعده يكون `viewer`.
+افتح دومين الـ frontend → تفتح لوحة التحكم مباشرة (لا يوجد تسجيل دخول).
+
+> ⚠️ **لا يوجد أي حماية على التطبيق.** أي شخص يعرف الدومين يقدر يفتح البيانات ويرفع ملفات ويعدّل الإعدادات. لو الرابط هيكون عام، ضع حماية على مستوى الشبكة (Railway private networking أو بروكسي أمامه بكلمة مرور).
 
 ---
 
@@ -89,7 +83,7 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 **البيانات المحلية لا تنتقل.** قاعدة `backend/attendance.db` هي SQLite على جهازك وغير مرفوعة أصلاً (مستبعدة في `.gitignore`). قاعدة Railway تبدأ فارغة، والجداول تُنشأ تلقائياً عند أول تشغيل. لو عايز تنقل بياناتك الحالية، ده يحتاج سكربت ترحيل منفصل — قوللي وأعمله.
 
-**البيانات التجريبية (`app/db/seed.py`) للتطوير فقط** — تنشئ `admin@example.com / admin123` بكلمة مرور معروفة وموظفين وهميين. لا تشغّلها على الإنتاج.
+**البيانات التجريبية (`app/db/seed.py`) للتطوير فقط** — تنشئ موظفين وهميين وبيانات حضور عشوائية. لا تشغّلها على الإنتاج.
 
 **التكلفة.** الخطة المجانية عندها حد شهري؛ ثلاث خدمات (backend + frontend + Postgres) تستهلك أسرع من خدمة واحدة.
 

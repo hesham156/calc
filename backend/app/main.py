@@ -7,7 +7,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app.api.routes import auth, employees, export, reports, settings as settings_routes, summary, uploads
+from app.api.routes import employees, export, reports, settings as settings_routes, summary, uploads
 from app.core.config import settings
 from app.db.database import Base, engine
 
@@ -53,6 +53,6 @@ def health():
     return {"status": "ok"}
 
 
-for router in (auth.router, uploads.router, employees.router, summary.router,
+for router in (uploads.router, employees.router, summary.router,
                settings_routes.router, reports.router, export.router):
     app.include_router(router)

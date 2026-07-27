@@ -8,9 +8,6 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "Attendance Analyzer"
     DATABASE_URL: str = "sqlite:///./attendance.db"
-    SECRET_KEY: str = "change-me-in-production"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     UPLOAD_DIR: str = "./uploads"
     EXPORT_DIR: str = "./exports"
     MAX_UPLOAD_MB: int = 50

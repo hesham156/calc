@@ -2,9 +2,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
 from app.db.database import get_db
-from app.models import AttendanceSummary, Employee, User
+from app.models import AttendanceSummary, Employee
 from app.schemas import AnalyzeRequest, DashboardOut
 from app.services.calculator import recompute_all
 
@@ -16,7 +15,6 @@ def dashboard_summary(
     year: int | None = None,
     month: int | None = Query(None, ge=1, le=12),
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
     stmt = select(
         func.count(func.distinct(AttendanceSummary.employee_id)),
@@ -47,7 +45,7 @@ def dashboard_summary(
 
 
 @router.post("/analyze")
-def analyze(payload: AnalyzeRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def analyze(payload: AnalyzeRequest, db: Session = Depends(get_db)):
     """Recompute all derived values + summaries with the current settings."""
     count = recompute_all(db, year=payload.year, month=payload.month)
     return {"recomputed_rows": count}

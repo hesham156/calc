@@ -4,16 +4,14 @@ import {
   BarChart3,
   FileSpreadsheet,
   LayoutDashboard,
-  LogOut,
   Menu,
   Settings,
   Upload,
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { getToken, setToken } from "@/lib/api";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -26,16 +24,7 @@ const NAV = [
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (!getToken()) router.replace("/login");
-    else setReady(true);
-  }, [router]);
-
-  if (!ready) return null;
 
   return (
     <div className="flex min-h-screen">
@@ -68,18 +57,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
-        <div className="absolute bottom-0 w-full border-t p-3">
-          <button
-            onClick={() => {
-              setToken(null);
-              router.replace("/login");
-            }}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent"
-          >
-            <LogOut className="h-4 w-4" />
-            تسجيل الخروج
-          </button>
-        </div>
       </aside>
 
       {open && <div className="fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={() => setOpen(false)} />}

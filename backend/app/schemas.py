@@ -1,33 +1,6 @@
 from datetime import date, datetime, time
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
-
-# ---------- Auth ----------
-
-
-class UserRegister(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
-    full_name: str = ""
-
-
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class TokenOut(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
-
-class UserOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    email: str
-    full_name: str
-    role: str
-
+from pydantic import BaseModel, ConfigDict, Field
 
 # ---------- Settings ----------
 

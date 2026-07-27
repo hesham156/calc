@@ -4,9 +4,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
 from app.db.database import get_db
-from app.models import Attendance, Employee, User
+from app.models import Attendance, Employee
 
 router = APIRouter(prefix="/api", tags=["reports"])
 
@@ -20,7 +19,6 @@ def reports(
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
     stmt = (
         select(Attendance, Employee)

@@ -19,7 +19,6 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg2://attendance:attendance@db:5432/attendance
-      SECRET_KEY: ${SECRET_KEY:-please-change-me-in-production}
       CORS_ORIGINS: http://localhost:3000
       UPLOAD_DIR: /data/uploads
       EXPORT_DIR: /data/exports

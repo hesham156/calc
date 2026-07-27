@@ -5,10 +5,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFi
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
 from app.core.config import settings
 from app.db.database import get_db
-from app.models import Upload, User
+from app.models import Upload
 from app.schemas import UploadOut
 from app.services.ingest import process_upload
 from app.services.parser.engine import ALLOWED_EXTENSIONS
@@ -21,7 +20,6 @@ async def upload_file(
     background: BackgroundTasks,
     file: UploadFile,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
@@ -48,12 +46,12 @@ async def upload_file(
 
 
 @router.get("/uploads", response_model=list[UploadOut])
-def list_uploads(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_uploads(db: Session = Depends(get_db)):
     return db.scalars(select(Upload).order_by(Upload.id.desc()).limit(50)).all()
 
 
 @router.get("/uploads/{upload_id}", response_model=UploadOut)
-def get_upload(upload_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def get_upload(upload_id: int, db: Session = Depends(get_db)):
     upload = db.get(Upload, upload_id)
     if upload is None:
         raise HTTPException(404, "Upload not found")
