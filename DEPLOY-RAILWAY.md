@@ -1,0 +1,110 @@
+# النشر على Railway
+
+المشروع يتكوّن من **3 خدمات** داخل مشروع Railway واحد:
+
+| الخدمة | Root Directory | الوصف |
+|--------|----------------|-------|
+| `Postgres` | — | قاعدة البيانات (تُضاف من قائمة Railway الجاهزة) |
+| `backend` | `backend` | FastAPI |
+| `frontend` | `frontend` | Next.js |
+
+كل خدمة تُبنى من الـ `Dockerfile` الخاص بها، والإعدادات مكتوبة في `backend/railway.json` و `frontend/railway.json`.
+
+---
+
+## الخطوات
+
+### 1) ارفع الكود على GitHub
+
+```bash
+git push origin main
+```
+
+### 2) أنشئ المشروع وقاعدة البيانات
+
+1. من [railway.com](https://railway.com) → **New Project** → **Deploy from GitHub repo** → اختر `hesham156/calc`.
+2. داخل المشروع: **+ New** → **Database** → **Add PostgreSQL**.
+
+### 3) خدمة الـ backend
+
+في إعدادات الخدمة → **Settings**:
+
+- **Root Directory** = `backend`
+- **Networking** → **Generate Domain** (لازم قبل ضبط المتغيرات)
+
+ثم **Variables**:
+
+| المتغير | القيمة |
+|---------|--------|
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
+| `SECRET_KEY` | نص عشوائي طويل — انظر الأمر بالأسفل |
+| `CORS_ORIGINS` | `https://${{frontend.RAILWAY_PUBLIC_DOMAIN}}` |
+| `UPLOAD_DIR` | `/data/uploads` |
+| `EXPORT_DIR` | `/data/exports` |
+| `COMPANY_NAME` | اسم شركتك |
+| `MAX_UPLOAD_MB` | `50` |
+
+لتوليد `SECRET_KEY` (نفّذه محلياً والصق الناتج في Railway فقط — لا تضعه في الريبو):
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+**Volume للملفات المرفوعة:** الملفات على Railway تُمسح مع كل إعادة نشر. من الخدمة → **+ Volume** → **Mount path** = `/data`.
+(البيانات المستخرجة من الملفات تُخزَّن في Postgres، فالـ Volume لحفظ الملفات الأصلية فقط.)
+
+### 4) خدمة الـ frontend
+
+**+ New** → **GitHub Repo** → نفس الريبو. ثم **Settings**:
+
+- **Root Directory** = `frontend`
+- **Networking** → **Generate Domain**
+
+ثم **Variables**:
+
+| المتغير | القيمة |
+|---------|--------|
+| `NEXT_PUBLIC_API_URL` | `https://${{backend.RAILWAY_PUBLIC_DOMAIN}}` |
+
+> ⚠️ **الأهم:** `NEXT_PUBLIC_API_URL` يُخبز داخل الـ bundle **وقت البناء** لا وقت التشغيل. لو ضبطته بعد أول نشر، لازم **Redeploy** للـ frontend وإلا هيفضل ينادي `http://localhost:8000` وتظهر الصفحة بدون بيانات.
+
+> ملاحظة: `${{backend...}}` و `${{frontend...}}` لازم تطابق **أسماء الخدمات الفعلية** عندك في Railway. لو سمّيتها غير كده، عدّل الاسم داخل الأقواس.
+
+### 5) أعد النشر وافتح الموقع
+
+بعد ضبط المتغيرات: **Redeploy** للخدمتين (الـ frontend إلزامي).
+
+افتح دومين الـ frontend → **سجّل الآن** → **أول حساب يُسجَّل يصبح admin تلقائياً**
+(انظر [auth.py:23](backend/app/api/routes/auth.py#L23)). أي حساب بعده يكون `viewer`.
+
+---
+
+## ملاحظات مهمة
+
+**البيانات المحلية لا تنتقل.** قاعدة `backend/attendance.db` هي SQLite على جهازك وغير مرفوعة أصلاً (مستبعدة في `.gitignore`). قاعدة Railway تبدأ فارغة، والجداول تُنشأ تلقائياً عند أول تشغيل. لو عايز تنقل بياناتك الحالية، ده يحتاج سكربت ترحيل منفصل — قوللي وأعمله.
+
+**البيانات التجريبية (`app/db/seed.py`) للتطوير فقط** — تنشئ `admin@example.com / admin123` بكلمة مرور معروفة وموظفين وهميين. لا تشغّلها على الإنتاج.
+
+**التكلفة.** الخطة المجانية عندها حد شهري؛ ثلاث خدمات (backend + frontend + Postgres) تستهلك أسرع من خدمة واحدة.
+
+---
+
+## بديل: النشر عبر الـ CLI
+
+يتطلب متصفحاً لتسجيل الدخول:
+
+```bash
+npm i -g @railway/cli
+```
+
+```bash
+railway login
+```
+
+ثم من داخل كل مجلد (`backend` ثم `frontend`):
+
+```bash
+railway up
+```
+
+الطريقة الأولى (GitHub) أفضل — كل `git push` ينشر تلقائياً.
