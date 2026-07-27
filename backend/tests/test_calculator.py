@@ -101,6 +101,24 @@ class TestDayComputation:
         compute_day(att, s)
         assert att.late_minutes == 20
 
+    def test_placeholder_schedule_falls_back_to_settings(self):
+        s = make_settings()
+        # device writes 06:00 -> 06:00 on days with no timetable: a zero-length
+        # window is not a schedule, so late/early come from the settings instead
+        att = make_att(scheduled_in=time(6, 0), scheduled_out=time(6, 0),
+                       check_in=time(11, 0), check_out=time(15, 0))
+        compute_day(att, s)
+        assert att.late_minutes == 180  # 11:00 vs the configured 08:00 start
+        assert att.early_leave_minutes == 120  # 15:00 vs the configured 17:00 end
+
+    def test_reversed_schedule_falls_back_to_settings(self):
+        s = make_settings()
+        # 09:00 -> 06:00 cannot be read as a same-day window
+        att = make_att(scheduled_in=time(9, 0), scheduled_out=time(6, 0),
+                       check_in=time(9, 0), check_out=time(17, 0))
+        compute_day(att, s)
+        assert att.late_minutes == 60  # 09:00 vs the configured 08:00 start
+
 
 class TestDeductionPolicies:
     def test_per_minute(self):

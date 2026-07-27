@@ -70,10 +70,13 @@ def compute_day(att: Attendance, s: WorkSettings) -> None:
     else:
         att.status = "present"
 
-    work_start = att.scheduled_in or s.work_start
-    work_end = att.scheduled_out or s.work_end
-    if work_end <= work_start:  # scheduled overnight or ambiguous -> fall back
-        work_end = s.work_end if s.work_end > work_start else time(23, 59)
+    # The per-day schedule exported by the device is trusted only when it forms a
+    # valid same-day window. Devices write placeholders on unscheduled days (e.g.
+    # 06:00 -> 06:00), and reading those as a 06:00 start inflated the late
+    # minutes; anything unusable falls back to the configured work day.
+    work_start, work_end = s.work_start, s.work_end
+    if att.scheduled_in and att.scheduled_out and att.scheduled_in < att.scheduled_out:
+        work_start, work_end = att.scheduled_in, att.scheduled_out
 
     late = early = worked = overtime = 0
     break_minutes = att.break_minutes or 0
