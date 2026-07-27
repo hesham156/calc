@@ -105,6 +105,11 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 **السبب:** الـ **Root Directory** غير مضبوط، فلم يجد Railway الـ `Dockerfile`.
 **الحل:** اضبطه على `/backend` أو `/frontend` كما في الخطوات أعلاه، ثم **Redeploy**.
 
+### `failed to compute cache key: "/app/public": not found`
+
+مجلد `frontend/public/` فارغ، وجيت لا يتتبّع المجلدات الفارغة — فلا يصل إلى سياق البناء.
+معالَج في الـ Dockerfile بـ `RUN mkdir -p public`. لو أضفت مجلداً فارغاً آخر يعتمد عليه البناء، ستحتاج نفس الحيلة أو ملف `.gitkeep` بداخله.
+
 ### الموقع يفتح لكن بلا بيانات / أخطاء شبكة في الـ console
 
 `NEXT_PUBLIC_API_URL` لم يُضبط **قبل** البناء، فالواجهة تنادي `http://localhost:8000`.
