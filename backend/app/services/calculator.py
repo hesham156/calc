@@ -215,5 +215,7 @@ def rebuild_summaries(db: Session, year: int | None = None, month: int | None = 
             db.add(summary)
         for k, v in b.items():
             setattr(summary, k, round(v, 2) if isinstance(v, float) else v)
-        summary.net_minutes = b["worked_minutes"] + b["overtime_minutes"] - b["deduction_minutes"]
+        # worked_minutes already spans the whole attendance, overtime hours
+        # included, so adding overtime here would count those hours twice
+        summary.net_minutes = b["worked_minutes"] - b["deduction_minutes"]
     db.flush()

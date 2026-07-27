@@ -144,6 +144,30 @@ def test_rows_expose_the_shift_window_they_were_judged_against(client):
     assert days["2026-07-02"]["work_start"] == settings["work_start"]
 
 
+def test_net_hours_do_not_double_count_overtime(client):
+    from app.db.database import SessionLocal
+    from app.models import Attendance, Employee
+
+    db = SessionLocal()
+    emp = Employee(code="9003", name="صاحب أوفر تايم")
+    db.add(emp)
+    db.flush()
+    # Wednesday 08:00 -> 20:00 against the default 08:00-17:00 day
+    db.add(Attendance(employee_id=emp.id, date=date(2026, 7, 1),
+                      check_in=time(8, 0), check_out=time(20, 0)))
+    db.commit()
+    emp_id = emp.id
+    db.close()
+
+    client.post("/api/analyze", json={"year": 2026, "month": 7})
+    s = client.get(f"/api/employees/{emp_id}/summary", params={"year": 2026, "month": 7}).json()
+
+    assert s["worked_minutes"] == 11 * 60  # 12h on site - 1h break
+    assert s["overtime_minutes"] == 3 * 60  # 17:00 -> 20:00, already inside worked
+    assert s["deduction_minutes"] == 0
+    assert s["net_minutes"] == s["worked_minutes"] - s["deduction_minutes"]
+
+
 def test_report_rejects_unknown_filter(client):
     r = client.get("/api/reports", params={"flags": "bogus"})
     assert r.status_code == 400
