@@ -80,6 +80,32 @@ class TestDayComputation:
         compute_day(att, s)
         assert att.status == "weekend"
 
+    def test_working_on_a_day_off_is_all_overtime(self):
+        s = make_settings()
+        # Friday is a weekly day off: arriving at 09:00 is not "an hour late"
+        att = make_att(date=date(2026, 7, 24), check_in=time(9, 0), check_out=time(18, 0))
+        compute_day(att, s)
+        assert att.status == "weekend"
+        assert att.late_minutes == 0
+        assert att.early_leave_minutes == 0
+        assert att.deduction_minutes == 0
+        assert att.worked_minutes == 8 * 60  # 9h - 1h break
+        assert att.overtime_minutes == 8 * 60
+        assert att.overtime_amount == round(8 * 60 / 60 * 15, 2)
+
+    def test_day_off_without_punches_stays_empty(self):
+        s = make_settings()
+        att = make_att(date=date(2026, 7, 24))
+        compute_day(att, s)
+        assert (att.worked_minutes, att.overtime_minutes) == (0, 0)
+
+    def test_a_working_saturday_is_a_normal_day(self):
+        s = make_settings(weekend_days=["Friday"])
+        att = make_att(date=date(2026, 7, 25), check_in=time(8, 30), check_out=time(17, 0))  # Saturday
+        compute_day(att, s)
+        assert att.status == "present"
+        assert att.late_minutes == 30
+
     def test_leave_flag(self):
         s = make_settings()
         att = make_att(file_leave=True)

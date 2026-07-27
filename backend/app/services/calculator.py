@@ -79,7 +79,9 @@ def compute_day(att: Attendance, s: WorkSettings) -> None:
     # ----- status -----
     if att.file_leave or status_lower in {"leave", "vacation", "اجازة", "إجازة"}:
         att.status = "leave"
-    elif not has_punch and is_weekend:
+    elif is_weekend:
+        # a weekly day off stays a day off even when the employee shows up;
+        # punching in on it must never read as arriving late for work
         att.status = "weekend"
     elif att.file_absence and not has_punch:
         att.status = "absent"
@@ -103,26 +105,31 @@ def compute_day(att: Attendance, s: WorkSettings) -> None:
 
     late = early = worked = overtime = 0
     break_minutes = att.break_minutes or 0
+    # showing up on a day off: no schedule applies, so the whole shift is overtime
+    worked_day_off = att.status in ("weekend", "holiday") and att.check_in and att.check_out
 
-    if att.status in ("present", "incomplete") and att.check_in and att.check_out:
+    if att.check_in and att.check_out and (worked_day_off or att.status in ("present", "incomplete")):
         gross = _duration_minutes(att.check_in, att.check_out, att.out_next_day)
         if not break_minutes and gross > s.break_minutes:
             break_minutes = s.break_minutes
         worked = max(0, gross - break_minutes)
 
-        # late: minutes after scheduled start, only when beyond the grace period
-        raw_late = max(0, _minutes(att.check_in) - _minutes(work_start))
-        late = raw_late if raw_late > s.grace_minutes else 0
+        if worked_day_off:
+            overtime = worked  # nothing was scheduled, so all of it is extra
+        else:
+            # late: minutes after scheduled start, only when beyond the grace period
+            raw_late = max(0, _minutes(att.check_in) - _minutes(work_start))
+            late = raw_late if raw_late > s.grace_minutes else 0
 
-        # early leave: minutes before scheduled end (never for overnight rows)
-        if not att.out_next_day:
-            early = max(0, _minutes(work_end) - _minutes(att.check_out))
+            # early leave: minutes before scheduled end (never for overnight rows)
+            if not att.out_next_day:
+                early = max(0, _minutes(work_end) - _minutes(att.check_out))
 
-        # overtime: worked time after the end of this row's work day
-        if att.out_next_day:
-            overtime = _duration_minutes(overtime_after, att.check_out, True)
-        elif _minutes(att.check_out) > _minutes(overtime_after):
-            overtime = _minutes(att.check_out) - _minutes(overtime_after)
+            # overtime: worked time after the end of this row's work day
+            if att.out_next_day:
+                overtime = _duration_minutes(overtime_after, att.check_out, True)
+            elif _minutes(att.check_out) > _minutes(overtime_after):
+                overtime = _minutes(att.check_out) - _minutes(overtime_after)
 
     # Everything above is derived from the shift window and the punches alone.
     # The late/early/overtime/worked columns the device writes into the file are
@@ -130,7 +137,7 @@ def compute_day(att: Attendance, s: WorkSettings) -> None:
     # contradicted the schedule we calculate from. file_absence / file_leave are
     # still honoured (in the status block) since no punch pattern implies them.
 
-    if att.status not in ("present", "incomplete"):
+    if att.status not in ("present", "incomplete") and not worked_day_off:
         late = early = overtime = worked = 0
         break_minutes = 0
 
